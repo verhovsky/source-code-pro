@@ -8,11 +8,12 @@ The file names of the SVG glyphs need to match their corresponding glyph final n
 import sys
 import re
 from pathlib import Path
+import warnings
 
 try:
     from fontTools import ttLib
 except ImportError:
-    sys.exit("ERROR: FontTools Python module is not installed.")
+    sys.exit("ERROR: The FontTools Python module is not installed.")
 
 TABLE_TAG = "SVG "
 
@@ -51,11 +52,8 @@ def process_font_file(font_file_path, svg_file_paths):
         try:
             gid = font.getGlyphID(glyph_name)
         except KeyError:
-            print(
-                "ERROR: Could not find a glyph named {} in the font {}.".format(
-                    glyph_name, font_file_path.name
-                ),
-                file=sys.stderr,
+            warnings.warn(
+                f"ERROR: Could not find a glyph named {glyph_name} in the font {font_file_path.name}."
             )
             continue
 
@@ -72,13 +70,11 @@ def process_font_file(font_file_path, svg_file_paths):
 
     # don't do any changes to the source OTF/TTF font if there's no SVG data
     if not svg_docs_dict:
-        print(
-            "ERROR: Could not find any artwork files " "that can be added to the font.",
-            file=sys.stderr,
+        sys.exit(
+            "ERROR: Could not find any artwork files that can be added to the font."
         )
-        return
 
-    svg_docs_list = [svg_docs_dict[index] for index in sorted(svg_docs_dict.keys())]
+    svg_docs_list = [svg_docs_dict[key] for key in sorted(svg_docs_dict.keys())]
 
     svg_table = ttLib.newTable(TABLE_TAG)
     svg_table.compressed = False  # GZIP the SVG docs
@@ -87,7 +83,7 @@ def process_font_file(font_file_path, svg_file_paths):
     font.save(font_file_path)
     font.close()
 
-    print("SVG table successfully added to {}".format(font_file_path), file=sys.stderr)
+    print(f"SVG table successfully added to {font_file_path}", file=sys.stderr)
 
 
 def validate_svg_files(svg_file_paths):
@@ -98,15 +94,13 @@ def validate_svg_files(svg_file_paths):
     validated_paths = []
 
     for file_path in svg_file_paths:
-        # skip hidden files (filenames that start with period)
         if file_path.name.startswith("."):
             continue
 
         # find <svg> blob
         if not svg_element_regex.search(file_path.read_text()):
-            print(
-                "WARNING: Could not find <svg> element in the file. "
-                "Skiping {}".format(file_path)
+            warnings.warn(
+                f"WARNING: Could not find <svg> element in the file. Skiping {file_path}"
             )
             continue
 
@@ -132,39 +126,28 @@ def run():
     svg_folder_path = Path(sys.argv[2]).resolve()
 
     # Font file path
-    if font_file_path.is_file():
-        if get_font_format(font_file_path) not in ["OTF", "TTF"]:
-            print("ERROR: The path is not a valid OTF or TTF font.", file=sys.stderr)
-            return
-    else:
-        print("ERROR: The path to the font is invalid.", file=sys.stderr)
-        return
+    if not font_file_path.is_file():
+        sys.exit("ERROR: The path to the font is invalid.")
+    if get_font_format(font_file_path) not in ["OTF", "TTF"]:
+        sys.exit("ERROR: The path is not a valid OTF or TTF font.")
 
     # SVG folder path
     if not svg_folder_path.is_dir():
-        print(
-            "ERROR: The path to the folder " "containing the SVG files is invalid.",
-            file=sys.stderr,
-        )
-        return
+        sys.exit("ERROR: The path to the folder containing the SVG files is invalid.")
 
-    svg_file_paths = [path for path in svg_folder_path.rglob("*") if path.is_file()]
-    # validate the SVGs
-    svg_file_paths = validate_svg_files(svg_file_paths)
+    svg_file_paths = validate_svg_files(svg_folder_path.rglob("*.svg"))
 
     if not svg_file_paths:
-        print("WARNING: No SVG files were found.", file=sys.stderr)
-        return
+        sys.exit("WARNING: No SVG files were found.")
 
     process_font_file(font_file_path, svg_file_paths)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
+        print("To run this script type:")
         print(
-            "To run this script type:\n  "
-            "python {} <path to input OTF/TTF file>  "
-            "<path to folder tree containing SVG files>".format(sys.argv[0])
+            f"  python3 {sys.argv[0]} <path to input OTF/TTF file> <path to folder tree containing SVG files>"
         )
     else:
         run()
