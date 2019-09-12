@@ -16,7 +16,7 @@ ttf_dir="$DIR/target/TTF"
 mkdir -p "$otf_dir" "$ttf_dir"
 
 # path to Python script that adds the SVG table
-addSVG="$DIR"/addSVGtable.py
+add_svg="$DIR"/add_svg_table.py
 
 # path to UVS file
 UVS="$DIR"/uvs.txt
@@ -36,7 +36,7 @@ function build_font {
     echo "Building TTF ..."
     makeotf -f "$font_ttf" -r -ci "$UVS" -ff "$font_ufo"/features.fea
     echo "Adding SVG table ..."
-    "$addSVG" "$font_dir"/$ps_name.otf "$DIR"/svg
+    "$add_svg" "$font_dir"/$ps_name.otf "$DIR"/svg
 
     # copy SVG and DSIG tables from OTF to TTF
     sfntedit -x DSIG="$font_dir"/.tb_DSIG,SVG="$font_dir"/.tb_SVG "$font_dir"/$ps_name.otf

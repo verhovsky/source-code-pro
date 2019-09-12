@@ -14,7 +14,7 @@ rm -rf "$var_dir"
 mkdir -p "$var_dir"
 
 # path to Python script that adds the SVG table
-addSVG="$DIR"/addSVGtable.py
+add_svg="$DIR"/add_svg_table.py
 
 # path to UVS file
 UVS="$DIR"/uvs.txt
@@ -42,7 +42,7 @@ function build_var_font {
 
 	# add SVG table to variable OTF
 	echo 'Adding SVG table to' $2.otf
-	"$addSVG" "$otf_file" "$DIR"/svg
+	"$add_svg" "$otf_file" "$DIR"/svg
 
 	# build variable TTF
 	fontmake -m "$dsp_file" -o variable --production-names --output-path "$ttf_file" --feature-writer None
