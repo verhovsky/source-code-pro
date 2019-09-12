@@ -12,135 +12,130 @@ import re
 try:
     from fontTools import ttLib, version
 except ImportError:
-    print("ERROR: FontTools Python module is not installed.", file=sys.stderr)
-    sys.exit(1)
+    sys.exit("ERROR: FontTools Python module is not installed.")
 
-TABLE_TAG = 'SVG '
+TABLE_TAG = "SVG "
 
 # Regexp patterns
-reSVGelement = re.compile(r"<svg.+?>.+?</svg>", re.DOTALL)
-reIDvalue = re.compile(r"<svg[^>]+?(id=\".*?\").+?>", re.DOTALL)
-reViewBox = re.compile(r"<svg.+?(viewBox=[\"|\'][\d, ]+[\"|\']).+?>", re.DOTALL)
-reWhiteSpace = re.compile(r">\s+<", re.DOTALL)
+svg_element_regex = re.compile(r"<svg.+?>.+?</svg>", re.DOTALL)
+id_value_regex = re.compile(r"<svg[^>]+?(id=\".*?\").+?>", re.DOTALL)
+view_box_regex = re.compile(r"<svg.+?(view_box=[\"|\'][\d, ]+[\"|\']).+?>", re.DOTALL)
+white_space_regex = re.compile(r">\s+<", re.DOTALL)
 
 
-def readFile(filePath):
-    with open(filePath, "rt") as f:
+def read_file(file_path):
+    with open(file_path, "rt") as f:
         return f.read()
 
 
-def setIDvalue(data, gid):
-    id = reIDvalue.search(data)
+def set_id_value(data, gid):
+    id = id_value_regex.search(data)
     if id:
-        newData = re.sub(id.group(1), 'id="glyph{}"'.format(gid), data)
+        new_data = re.sub(id.group(1), 'id="glyph{}"'.format(gid), data)
     else:
-        newData = re.sub('<svg', '<svg id="glyph{}"'.format(gid), data)
-    return newData
+        new_data = re.sub("<svg", '<svg id="glyph{}"'.format(gid), data)
+    return new_data
 
 
-def fixViewBox(data):
-    viewBox = reViewBox.search(data)
-    if not viewBox:
+def fix_view_box(data):
+    view_box = view_box_regex.search(data)
+    if not view_box:
         return data
-    fixedViewBox = 'viewBox=\"0 1000 1000 1000\"'
-    fixedData = re.sub(viewBox.group(1), fixedViewBox, data)
-    return fixedData
+    fixed_view_box = 'view_box="0 1000 1000 1000"'
+    fixed_data = re.sub(view_box.group(1), fixed_view_box, data)
+    return fixed_data
 
 
-def getGlyphNameFromFileName(filePath):
-    folderPath, fontFileName = os.path.split(filePath)
-    fileNameNoExtension, fileExtension = os.path.splitext(fontFileName)
-    return fileNameNoExtension
+def get_glyph_name_from_file_name(file_path):
+    folder_path, font_file_name = os.path.split(file_path)
+    filename_no_extension, file_extension = os.path.splitext(font_file_name)
+    return filename_no_extension
 
 
-def processFontFile(fontFilePath, svgFilePathsList):
-    font = ttLib.TTFont(fontFilePath)
+def process_font_file(font_file_path, svg_file_paths_list):
+    font = ttLib.TTFont(font_file_path)
 
     # first create a dictionary because the SVG glyphs need to be sorted in the table
-    svgDocsDict = {}
+    svg_docs_dict = {}
 
-    for svgFilePath in svgFilePathsList:
-        gName = getGlyphNameFromFileName(svgFilePath)
+    for svg_file_path in svg_file_paths_list:
+        glyph_name = get_glyph_name_from_file_name(svg_file_path)
 
         try:
-            gid = font.getGlyphID(gName)
+            gid = font.getGlyphID(glyph_name)
         except KeyError:
             print(
                 "ERROR: Could not find a glyph named {} in the font {}.".format(
-                    gName, os.path.split(fontFilePath)[1]
+                    glyph_name, os.path.split(font_file_path)[1]
                 ),
-                file=sys.stderr
+                file=sys.stderr,
             )
             continue
 
-        svgItemsList = []
-        svgItemData = readFile(svgFilePath)
-        svgItemData = setIDvalue(svgItemData, gid)
-        svgItemData = fixViewBox(svgItemData)
+        svg_items_list = []
+        svg_item_data = read_file(svg_file_path)
+        svg_item_data = set_id_value(svg_item_data, gid)
+        svg_item_data = fix_view_box(svg_item_data)
         # Remove all white space between elements
-        for whiteSpace in set(reWhiteSpace.findall(svgItemData)):
-            svgItemData = svgItemData.replace(whiteSpace, '><')
-        svgItemsList.append(svgItemData.strip())
-        svgItemsList.extend([gid, gid])
-        svgDocsDict[gid] = svgItemsList
+        for white_space in set(white_space_regex.findall(svg_item_data)):
+            svg_item_data = svg_item_data.replace(white_space, "><")
+        svg_items_list.append(svg_item_data.strip())
+        svg_items_list.extend([gid, gid])
+        svg_docs_dict[gid] = svg_items_list
 
     # don't do any changes to the source OTF/TTF font if there's no SVG data
-    if not svgDocsDict:
+    if not svg_docs_dict:
         print(
-            "ERROR: Could not find any artwork files "
-            "that can be added to the font.",
-            file=sys.stderr
+            "ERROR: Could not find any artwork files " "that can be added to the font.",
+            file=sys.stderr,
         )
         return
 
-    svgDocsList = [svgDocsDict[index] for index in sorted(svgDocsDict.keys())]
+    svg_docs_list = [svg_docs_dict[index] for index in sorted(svg_docs_dict.keys())]
 
-    svgTable = ttLib.newTable(TABLE_TAG)
-    svgTable.compressed = False  # GZIP the SVG docs
-    svgTable.docList = svgDocsList
-    font[TABLE_TAG] = svgTable
-    font.save(fontFilePath)
+    svg_table = ttLib.newTable(TABLE_TAG)
+    svg_table.compressed = False  # GZIP the SVG docs
+    svg_table.docList = svg_docs_list
+    font[TABLE_TAG] = svg_table
+    font.save(font_file_path)
     font.close()
 
-    print(
-        "SVG table successfully added to {}".format(fontFilePath),
-        file=sys.stderr
-    )
+    print("SVG table successfully added to {}".format(font_file_path), file=sys.stderr)
 
 
-def validateSVGfiles(svgFilePathsList):
+def validate_svg_files(svg_file_paths_list):
     """
     Light validation of SVG files.
     Checks that there is an <svg> element.
     """
-    validatedPaths = []
+    validated_paths = []
 
-    for filePath in svgFilePathsList:
+    for file_path in svg_file_paths_list:
         # skip hidden files (filenames that start with period)
-        fileName = os.path.basename(filePath)
-        if fileName[0] == '.':
+        filename = os.path.basename(file_path)
+        if filename[0] == ".":
             continue
 
         # read file
-        data = readFile(filePath)
+        data = read_file(file_path)
 
         # find <svg> blob
-        svg = reSVGelement.search(data)
+        svg = svg_element_regex.search(data)
         if not svg:
             print(
                 "WARNING: Could not find <svg> element in the file. "
-                "Skiping {}".format(filePath)
+                "Skiping {}".format(file_path)
             )
             continue
 
-        validatedPaths.append(filePath)
+        validated_paths.append(file_path)
 
-    return validatedPaths
+    return validated_paths
 
 
-def getFontFormat(fontFilePath):
+def get_font_format(font_file_path):
     # these lines were scavenged from fontTools
-    with open(fontFilePath, "rb") as f:
+    with open(font_file_path, "rb") as f:
         header = f.read(256)
         head = header[:4]
     if head == b"OTTO":
@@ -151,50 +146,51 @@ def getFontFormat(fontFilePath):
 
 
 def run():
-    fontFilePath = os.path.realpath(sys.argv[1])
-    svgFolderPath = os.path.realpath(sys.argv[2])
+    font_file_path = os.path.realpath(sys.argv[1])
+    svg_folder_path = os.path.realpath(sys.argv[2])
 
     # Font file path
-    if os.path.isfile(fontFilePath):
-        if getFontFormat(fontFilePath) not in ["OTF", "TTF"]:
-            print("ERROR: The path is not a valid OTF or TTF font.",
-                  file=sys.stderr)
+    if os.path.isfile(font_file_path):
+        if get_font_format(font_file_path) not in ["OTF", "TTF"]:
+            print("ERROR: The path is not a valid OTF or TTF font.", file=sys.stderr)
             return
     else:
-        print("ERROR: The path to the font is invalid.",
-              file=sys.stderr)
+        print("ERROR: The path to the font is invalid.", file=sys.stderr)
         return
 
     # SVG folder path
-    if os.path.isdir(svgFolderPath):
-        svgFilePathsList = []
-        for dirName, subdirList, fileList in os.walk(
-                svgFolderPath):  # Support nested folders
-            for file in fileList:
-                svgFilePathsList.append(os.path.join(dirName,
-                                                     file))  # Assemble the full paths, not just file names
+    if os.path.isdir(svg_folder_path):
+        svg_file_paths_list = []
+        for dir_name, subdir_list, file_list in os.walk(
+            svg_folder_path
+        ):  # Support nested folders
+            for file in file_list:
+                svg_file_paths_list.append(
+                    os.path.join(dir_name, file)
+                )  # Assemble the full paths, not just file names
     else:
         print(
-            "ERROR: The path to the folder "
-            "containing the SVG files is invalid.",
-            file=sys.stderr
+            "ERROR: The path to the folder " "containing the SVG files is invalid.",
+            file=sys.stderr,
         )
         return
 
     # validate the SVGs
-    svgFilePathsList = validateSVGfiles(svgFilePathsList)
+    svg_file_paths_list = validate_svg_files(svg_file_paths_list)
 
-    if not svgFilePathsList:
+    if not svg_file_paths_list:
         print("WARNING: No SVG files were found.", file=sys.stderr)
         return
 
-    processFontFile(fontFilePath, svgFilePathsList)
+    process_font_file(font_file_path, svg_file_paths_list)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("To run this script type:\n  "
-              "python {} <path to input OTF/TTF file>  "
-              "<path to folder tree containing SVG files>".format(sys.argv[0]))
+        print(
+            "To run this script type:\n  "
+            "python {} <path to input OTF/TTF file>  "
+            "<path to folder tree containing SVG files>".format(sys.argv[0])
+        )
     else:
         run()
