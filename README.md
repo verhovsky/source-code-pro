@@ -17,12 +17,12 @@ in user interface (UI) environments.
 
 ### Requirements
 
-To build the binary font files from source, you need Python 3 along with the
+To build the binary font files from source, you need Python 3.6 or later, along with the
 [Adobe Font Development Kit for OpenType](https://github.com/adobe-type-tools/afdko/) (AFDKO) and
 [FontTools](https://github.com/fonttools/fonttools) packages, which you can install with
 
 ```sh
-pip3 install afdko fonttools
+pip install afdko fonttools
 ```
 
 ### Building one font
@@ -65,7 +65,7 @@ build.cmd
 To build the variable TTFs you must install **fontmake** using this command:
 
 ```sh
-pip3 install fontmake
+pip install fontmake
 ```
 
 A shell script named **buildVFs.sh** is provided in the root directory.
