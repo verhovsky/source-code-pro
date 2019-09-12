@@ -10,7 +10,7 @@ import sys
 import re
 
 try:
-    from fontTools import ttLib, version
+    from fontTools import ttLib
 except ImportError:
     sys.exit("ERROR: FontTools Python module is not installed.")
 
